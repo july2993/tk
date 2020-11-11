@@ -57,6 +57,12 @@ func AmendCMD() *cobra.Command {
 			// start test
 			//
 
+			err = testAddColumn3(db1, db2)
+			if err != nil {
+				return err
+			}
+			log.Print("testAddColumn3 success")
+
 			err = testAddColumn(db1, db2)
 			if err != nil {
 				return err
@@ -68,6 +74,12 @@ func AmendCMD() *cobra.Command {
 				return err
 			}
 			log.Print("testAddColumn2 success")
+
+			err = testAddColumn4(db1, db2)
+			if err != nil {
+				return err
+			}
+			log.Print("testAddColumn4 success")
 
 			return nil
 		},
@@ -84,6 +96,72 @@ func AmendCMD() *cobra.Command {
 	cmd.Flags().IntVar(&port2, "port2", 3306, "port of db")
 
 	return cmd
+}
+
+func testAddColumn4(db1 *sql.DB, db2 *sql.DB) error {
+	mustExec(db1, "drop table if exists accounts;")
+	mustExec(db2, "drop table if exists accounts;")
+
+	mustExec(db1, "create table accounts(id int primary key, balance bigint);")
+	mustExec(db1, "insert into accounts values(1, 100), (2, 0), (3, 1);")
+
+	txn1, err := db1.Begin()
+	if err != nil {
+		return err
+	}
+
+	mustExec(txn1, "set tidb_enable_amend_pessimistic_txn = 1;")
+
+	mustExec(db1, "alter table accounts add column bb int default 10;")
+	mustExec(db1, "insert into accounts values(100,100,100);")
+	mustExec(db1, "alter table accounts drop column bb;")
+	mustExec(db1, "alter table accounts add column bb int default 99;")
+
+	mustExec(txn1, "update accounts set balance = id where 1;")
+
+	err = txn1.Commit()
+	if err != nil {
+		return err
+	}
+
+	err = checkData(time.Minute, db1, db2)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func testAddColumn3(db1 *sql.DB, db2 *sql.DB) error {
+	mustExec(db1, "drop table if exists accounts;")
+	mustExec(db2, "drop table if exists accounts;")
+
+	mustExec(db1, "create table accounts(id int primary key, balance bigint);")
+	mustExec(db1, "insert into accounts values(1, 100), (2, 0), (3, 1);")
+
+	txn1, err := db1.Begin()
+	if err != nil {
+		return err
+	}
+
+	mustExec(txn1, "set tidb_enable_amend_pessimistic_txn = 1;")
+
+	mustExec(db1, "alter table accounts add column bb int not null;")
+	mustExec(db1, "alter table accounts add column cc int not null;")
+
+	mustExec(txn1, "update accounts set balance = id where 1;")
+
+	err = txn1.Commit()
+	if err != nil {
+		return err
+	}
+
+	err = checkData(time.Minute, db1, db2)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func testAddColumn2(db1 *sql.DB, db2 *sql.DB) error {
