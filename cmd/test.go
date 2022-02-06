@@ -81,6 +81,9 @@ to quickly create a Cobra application.`,
 						log.Error("failed to run txn", zap.String("error", err.Error()))
 						atomic.AddInt64(&failCount, 1)
 					}
+					if sleepAfterTXN != 0 {
+						time.Sleep(sleepAfterTXN)
+					}
 				}
 			}(db)
 		}
@@ -92,6 +95,8 @@ to quickly create a Cobra application.`,
 			fc := atomic.LoadInt64(&failCount)
 
 			fmt.Printf("totalCount: %d, failCount: %d, totalCountDiff: %d, failCountDiff: %d\n", tc, fc, tc-lastTotalCount, fc-lastFailCount)
+			lastTotalCount = tc
+			lastFailCount = fc
 		}
 
 		return nil
@@ -103,6 +108,7 @@ var password string
 var host string
 var port int
 var maxConn int
+var sleepAfterTXN time.Duration
 
 func init() {
 	rootCmd.AddCommand(testCmd)
@@ -112,6 +118,7 @@ func init() {
 	testCmd.Flags().StringVar(&host, "host", "127.0.0.1", "host of db")
 	testCmd.Flags().IntVar(&port, "port", 4000, "port of db")
 	testCmd.Flags().IntVarP(&maxConn, "max-connection", "p", 100, "max connection keep writing")
+	testCmd.Flags().DurationVar(&sleepAfterTXN, "sleep-after-txn", 0, "sleep duration after executing a txn")
 }
 
 func fmtDSN(host string, port int, user string, psw string) string {
